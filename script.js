@@ -85,36 +85,88 @@ function manilaParts(moment) {
 // That gives us an authoritative clock from the request we were making
 // anyway — no second request, and no third-party API to go down. Falls back
 // to the device clock, which is only wrong if the viewer's own clock is.
+let clockMoment = null;   // the instant the clock was seeded from
+
 function startClock(response) {
   const header = response && response.headers.get('date');
-  const moment = header ? new Date(header) : new Date();
+  let moment = header ? new Date(header) : new Date();
+  if (Number.isNaN(moment.getTime())) moment = new Date();
 
-  const now = manilaParts(Number.isNaN(moment.getTime()) ? new Date() : moment);
+  clockMoment = moment;
+  const now = manilaParts(moment);
   hours = now.hours;
   minutes = now.minutes;
   seconds = now.seconds;
   clockReady = header ? 'Server' : 'Device';
 }
 
+// Today in Manila, in the same shape winner_history uses: "September 8,2026".
+function manilaToday() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric'
+  }).formatToParts(clockMoment || new Date());
+
+  const get = type => parts.find(p => p.type === type).value;
+  return `${get('month')} ${get('day')},${get('year')}`;
+}
+
+// The history has drifted through several date formats over the years —
+// "September 5,2024", "September 5, 2024", "Sept. 5, 2024". Compare loosely
+// so a stray space doesn't decide whether a name leaks early.
+function sameDate(a, b) {
+  const normalise = value => String(value).toLowerCase().replace(/\s+/g, '');
+  return normalise(a) === normalise(b);
+}
+
 /* ---------- Load the draw data ---------- */
 
+function historyRow(entry) {
+  const row = document.createElement('div');
+  row.className = 'previousWinner';
+
+  const name = document.createElement('div');
+  name.className = 'historyName';
+  name.innerHTML = `<strong>${entry.name}</strong>`;
+
+  const date = document.createElement('div');
+  date.className = 'historyDate';
+  date.textContent = entry.date;
+
+  row.appendChild(name);
+  row.appendChild(date);
+  return row;
+}
+
 function renderHistory(entries) {
-  entries.forEach(entry => {
-    const row = document.createElement('div');
-    row.className = 'previousWinner';
+  entries.forEach(entry => historyContainer.appendChild(historyRow(entry)));
+}
 
-    const name = document.createElement('div');
-    name.className = 'historyName';
-    name.innerHTML = `<strong>${entry.name}</strong>`;
+function beforeDraw() {
+  return (hours * 3600 + minutes * 60 + seconds) < DRAW_TIME;
+}
 
-    const date = document.createElement('div');
-    date.className = 'historyDate';
-    date.textContent = entry.date;
+// Tonight's winner is published to users.json before 20:00, history entry and
+// all. Rendering the whole list on load would put that name in the history
+// panel hours early — one click from the board that is still counting down.
+// So hold tonight's entry back and add it at the reveal, which is when it
+// actually became history.
+//
+// "Tonight's" is decided by the date, not by matching names[0]: between
+// midnight and the daily update, names[0] is still last night's winner, and
+// that entry is real history that should stay on show.
+let historyHeld = false;
 
-    row.appendChild(name);
-    row.appendChild(date);
-    historyContainer.appendChild(row);
-  });
+// Read the entry from `data` rather than remembering it, so that if refresh()
+// picked up a newer users.json as the reel landed, the panel gets that file's
+// winner rather than the one this tab loaded hours ago.
+function releaseHistory() {
+  if (!historyHeld) return;
+  historyHeld = false;
+
+  const top = data && data.winner_history && data.winner_history[0];
+  if (top && top.name === data.names[0]) {
+    historyContainer.prepend(historyRow(top));
+  }
 }
 
 fetch(DATA_URL)
@@ -125,7 +177,24 @@ fetch(DATA_URL)
   })
   .then(json => {
     data = json;
-    renderHistory(json.winner_history);
+
+    const entries = json.winner_history;
+    const top = entries[0];
+
+    // Dated today, matching the name about to be revealed, and the draw has
+    // not run yet — that is tonight's entry and nobody should see it until
+    // 20:00. Anything else is genuine history and renders normally.
+    const isTonights = top
+      && sameDate(top.date, manilaToday())
+      && top.name === json.names[0]
+      && beforeDraw();
+
+    if (isTonights) {
+      historyHeld = true;
+      renderHistory(entries.slice(1));
+    } else {
+      renderHistory(entries);
+    }
   })
   .catch(error => {
     console.error('There was a problem with the fetch operation:', error);
@@ -181,14 +250,19 @@ function getRandomName() {
     if (!hasRevealed) await refresh();
 
     clearInterval(spinTimer);
-    winnerSlot.innerText = `${data.names[0]}`;
     isSpinning = false;
+
+    // Repaint the whole board on every landing, not just the first. The
+    // 10-second grace window restarts the reel once a second, and each of
+    // those later spinners scribbles random pool names over the eight slots
+    // on its way past — without this they stay random after the draw.
+    showResult();
 
     if (!hasRevealed) {
       addGlow();
       hasRevealed = true;
       celebrate();
-      showResult();
+      releaseHistory();          // tonight's entry joins the panel now, not earlier
     }
   }, SPIN_TIME);
 }
@@ -252,6 +326,7 @@ function updateTime() {
       showResult();
       hasRevealed = true;
       celebrate();
+      releaseHistory();
     }
   } else if (secondsToDraw < DRAW_TIME && !isSpinning) {
     // Midnight to 20:00 — count down.
