@@ -106,15 +106,18 @@ git commit -m "Draw: tonights_winner"
 git push
 ```
 
-Pushing is deploying — GitHub Pages rebuilds the site on every push to the
-default branch. Give it a minute or two before the file is live, and check
-the Actions tab if it seems slow.
+Pushing is deploying — Vercel rebuilds the site on every push to `main`,
+usually in about 30 seconds. It runs `check.mjs` first, so a broken file fails
+the build and the site keeps serving the last good version.
 
-**Timing.** Publish by 19:45 to be comfortable. The page now re-reads
-`users.json` as the reel lands, so a tab someone left open since the morning
-picks up your change too — that used to be broken, and tabs opened early
-revealed the previous night's name. It is still worth leaving margin for the
-Pages deploy rather than pushing at 19:59.
+**Timing.** Publish by 19:55 at the latest, and 19:45 if you want room to spot
+a mistake. The page re-reads `users.json` as the reel lands, so a tab someone
+left open since the morning picks up your change too — that used to be broken,
+and tabs opened early revealed the previous night's name.
+
+**Confirm it.** Vercel's build log prints `tonight's reveal: <name>` — that is
+`check.mjs` running as the build command, telling you what the site will show
+at 20:00. Or just open the site after 30 seconds and look at it.
 
 ## What the check found in the current file
 
@@ -162,4 +165,4 @@ be started by hand. If nobody ever wants a random draw, delete both.
 It's almost always malformed JSON. `script.js` has no fallback — a parse failure
 leaves it on "Waiting for Today's Lucky Winner" indefinitely, with the real error
 only in the browser console. Run `node tools/check.mjs`, fix the reported line,
-push, and wait for the Pages deploy.
+push, and wait for the Vercel deploy.

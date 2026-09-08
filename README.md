@@ -8,7 +8,7 @@ decoy variables.
 ## How it works
 
 A CSR chooses the winner. You put that name at the top of `names` in
-`users.json`, add the history entry, and push. GitHub Pages redeploys, and at
+`users.json`, add the history entry, and push. Vercel redeploys, and at
 20:00 Manila the page spins the reel and reveals `names[0]`.
 
 See [tools/README.md](tools/README.md) for the daily edit and

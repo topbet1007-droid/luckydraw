@@ -1,14 +1,21 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (DISABLED — the site is on Vercel)
 
-# Every push to main publishes the site. This replaces the built-in
-# "Deploy from a branch" mechanism, which stopped firing on pushes and gave
-# no indication it had — the site silently kept serving an old users.json.
-# An explicit workflow shows up in the Actions tab every time, pass or fail.
+# ---------------------------------------------------------------------------
+# The live site is hosted on Vercel, which deploys from this repo on every
+# push to main and does it in about 30 seconds rather than two or three
+# minutes. GitHub Pages has been unpublished.
+#
+# The `push:` trigger has been removed so this cannot fire on its own. Left
+# here, runnable only from the "Run workflow" button, in case Pages is ever
+# needed again — re-add the trigger and switch Settings -> Pages back on.
+#
+# The safety gate moved with the hosting: `node tools/check.mjs` is now
+# Vercel's Build Command, so a malformed users.json fails the build and
+# Vercel keeps serving the last good version.
+# ---------------------------------------------------------------------------
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:          # "Run workflow" button, to redeploy by hand
+  workflow_dispatch:          # "Run workflow" button only — never on push
 
 permissions:
   contents: read

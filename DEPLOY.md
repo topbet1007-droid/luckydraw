@@ -1,113 +1,71 @@
-# Going live on GitHub Pages
+# Hosting
 
-The site is entirely static — HTML, CSS, images, a sound and `users.json`.
-There is no server, no build step and nothing to configure. GitHub Pages hosts
-it free and redeploys on every push, which is what makes your daily update
-work: edit `users.json`, push, and the live site has it a minute later.
+The site is static — HTML, CSS, images, a sound and `users.json`. It is hosted
+on **Vercel**, which redeploys on every push to `main` in about 30 seconds.
 
-## One-time setup
+**Live:** <https://luckydraws-nine.vercel.app>
+**Repo:** <https://github.com/topbet1007-droid/luckydraw>
 
-### 1. Make it a git repository
+## How a push becomes a deploy
 
-In the VS Code terminal (**Ctrl+`**), from the project folder:
+1. You push to `main` (GitHub Desktop, or `git push`)
+2. Vercel sees the push and starts a build
+3. The build runs `node tools/check.mjs` — **this is the safety gate**
+4. If the check passes, the new files go live. If it fails, the build stops and
+   Vercel keeps serving the previous version
 
-```bash
-git init
-git add .
-git commit -m "GBET Lucky Draw"
-```
+Step 3 is why a malformed `users.json` can no longer blank the site at 8pm. The
+worst case is that your change doesn't go out, and the site carries on showing
+what it showed before.
 
-Git is already set up with your name and email, so this will just work.
+The build log also prints `tonight's reveal: <name>`, which is `check.mjs`
+saying what the site will land on at 20:00. Worth a glance after every push.
 
-### 2. Create the repository on GitHub
+## Project settings
 
-Go to <https://github.com/new>.
+Set once, at import. Vercel → project → Settings → Build & Deployment:
 
-- **Name** — anything, e.g. `lucky-draw`. If you name it exactly
-  `YOUR-USERNAME.github.io`, the site lives at `https://YOUR-USERNAME.github.io`
-  instead of `https://YOUR-USERNAME.github.io/lucky-draw/`. Both work.
-- **Public** — required for Pages on a free account.
-- **Do not** tick "Add a README" or any other starter file. You already have
-  files, and those options create a conflict you'd have to untangle.
+| Setting | Value |
+|---|---|
+| Framework Preset | `Other` |
+| Root Directory | `./` |
+| Build Command | `node tools/check.mjs` *(override on)* |
+| Output Directory | `.` *(override on)* |
+| Install Command | *(override off)* |
 
-Then push, using the URL GitHub shows you:
+The Output Directory override matters — without it Vercel looks for a `public`
+folder, doesn't find one, and fails the build.
 
-```bash
-git remote add origin https://github.com/YOUR-USERNAME/lucky-draw.git
-git branch -M main
-git push -u origin main
-```
+## GitHub Pages — retired
 
-The first push asks you to sign in. VS Code usually opens a browser window for
-this; if it asks for a password in the terminal instead, that is a *personal
-access token*, not your GitHub password — create one at
-<https://github.com/settings/tokens> with the `repo` scope.
+The site ran on GitHub Pages first. It has been unpublished, and
+`.github/workflows/pages.yml` has had its `push:` trigger removed so it cannot
+fire on its own. The workflow is still there and still runnable from the
+Actions tab if Pages is ever needed again — re-add the trigger and switch
+Settings → Pages back on.
 
-### 3. Turn on Pages
+Pages worked; it was just slower. Two to three minutes from push to live,
+against Vercel's thirty seconds, which is the difference between a 19:45 and a
+19:55 cutoff for publishing the winner.
 
-In the repository: **Settings → Pages**.
+## The clock
 
-- **Source** — Deploy from a branch
-- **Branch** — `main`, folder `/ (root)`
-- **Save**
+The page reads the Manila time from the `Date` header on the `users.json`
+response — the request it was making anyway. No third-party time API to go
+down and strand the page, and no dependence on the viewer's own clock unless
+that header is missing.
 
-Wait a minute or two, then reload that page. It will show the live URL at the
-top. Open it — you should see the countdown.
+This works on any host that serves a correct `Date` header, which is all of
+them. It was the same on Pages.
 
-## Your daily routine after that
+## If you ever need a custom domain
 
-Exactly what you do now, plus the check:
+Vercel → project → **Domains** → **Add**. It walks you through the DNS record.
+`luckydraws-nine.vercel.app` is a generated name and fine for internal use, but
+worth replacing with something like `draw.yourdomain.com` for anything shown to
+players.
 
-```bash
-git pull                    # only if anyone else pushes to this repo
-# edit users.json in VS Code — winner to names[0], history entry on top
-node tools/check.mjs
-git add users.json
-git commit -m "Draw: tonights_winner"
-git push
-```
+## Daily use
 
-Full detail in [tools/README.md](tools/README.md).
-
-**Publish by about 19:45.** Not because the page can't cope — it re-reads
-`users.json` as the reel lands now, so even a tab left open all day gets your
-change — but because the Pages deploy itself takes a minute or two and you
-don't want to be watching it at 19:59.
-
-## Checking it worked
-
-After a push, the repo's **Actions** tab shows the Pages deploy. Once it's
-green:
-
-```
-https://YOUR-USERNAME.github.io/lucky-draw/users.json
-```
-
-Open that in a browser and confirm the first name under `"names"` is tonight's
-winner. If it still shows the old one, the deploy hasn't finished — wait, then
-hard-reload with **Ctrl+Shift+R**.
-
-## What to know about this setup
-
-**The winner is readable before 8pm.** Anyone who opens the URL above, or looks
-at the repository, sees tonight's name from the moment you push. That is how
-the original worked and you chose to keep it. If that ever becomes a problem,
-the fix is not a bigger cache header or a private repo — the file has to stop
-containing the answer, which means a small server-side endpoint. Ask and I'll
-build it.
-
-**A push is a deploy.** Broken JSON goes live immediately, and the page has no
-fallback — it sits on "Waiting for Today's Lucky Winner" forever with the error
-only in the browser console. `node tools/check.mjs` before every push is the
-whole defence, and it exits non-zero on failure so you can wire it as a
-pre-push hook.
-
-**The clock comes from GitHub's servers now**, not `worldtimeapi.org`. The page
-reads the `Date` header on the `users.json` response — the request it was
-making anyway — so there is no third-party API left to go down and strand the
-page. If that header is somehow missing it falls back to the viewer's own
-device clock.
-
-**`users.json` still has known data problems** — two typo'd history keys that
-render blank, seven date formats, 10 duplicated names, and 349 past winners
-still in the pool. `node tools/check.mjs` lists them. None block the launch.
+Nothing here changes day to day. See [tools/README.md](tools/README.md) for the
+edit-check-commit-push routine.
