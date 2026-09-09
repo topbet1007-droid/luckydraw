@@ -27,14 +27,18 @@ to jump by line rather than scrolling.
 `names[0]` is the draw. Nothing else on the page decides the winner — not
 `winner_history`, not the order of anything else.
 
-**2. Put yesterday's winner back into the pool.** Don't delete them — paste
-their name somewhere in the **middle** of `names`, so they stay eligible for
-future draws. Around line 7500 is fine; the exact spot doesn't matter, only
-that it isn't the top.
+**The name may not already be in the file.** The CSR often gives a name that
+isn't in `names` at all, and that is normal — you are adding a new entrant.
+It also means **nothing can check the spelling for you.** `check.mjs` can
+confirm the name matches between the two places you type it, but it has no way
+to know whether the account exists. Copy-paste from the CSR's message rather
+than retyping, both times.
 
-This is why `check.mjs` reports "N previous winners are still in the entry
-pool" as a warning. For this process that is intended, not a problem. Ignore
-that one.
+**2. Deal with yesterday's winner.** Deleting their line is fine — winners do
+not have to stay in the pool. Leaving them in is also fine; the file currently
+holds 349 past winners who are still eligible, which is why `check.mjs`
+reports that as a warning rather than an error. Either way, they must not stay
+at the top.
 
 **3. Add the history entry.** Find `"winner_history"` with **Ctrl+F**, and add
 a new object as the first item:
